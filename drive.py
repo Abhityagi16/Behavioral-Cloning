@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import shutil
 
+import cv2
 import numpy as np
 import socketio
 import eventlet
@@ -44,7 +45,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 9
+set_speed = 14
 controller.set_desired(set_speed)
 
 
@@ -61,6 +62,7 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+        image_array = preprocess(image_array)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
@@ -77,6 +79,15 @@ def telemetry(sid, data):
         # NOTE: DON'T EDIT THIS.
         sio.emit('manual', data={}, skip_sid=True)
 
+def preprocess(image):
+    # processing image like in model.py
+    h, w = image.shape[:2]
+    dim = (int(w * 0.5), int(h * 0.5))
+    image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+    # crop image to 160x40 (take away 30px from top and 10px from bottom) so we only have the important parts
+    image = image[30:70, 0:160]
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+    return image
 
 @sio.on('connect')
 def connect(sid, environ):
